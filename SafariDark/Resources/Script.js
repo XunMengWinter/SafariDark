@@ -1,9 +1,24 @@
+let settingsName = "Safari Settings";
+
+function setText(selector, text) {
+    const element = document.querySelector(selector);
+
+    if (element) {
+        element.innerText = text;
+    }
+}
+
 function showStatus(state, useSettingsInsteadOfPreferences) {
+    settingsName = useSettingsInsteadOfPreferences ? "Safari Settings" : "Safari Preferences";
+
     if (useSettingsInsteadOfPreferences) {
-        document.getElementsByClassName("state-unknown")[0].innerText = "SafariDark can darken webpages locally after you enable the extension in Safari Settings.";
-        document.getElementsByClassName("state-off")[0].innerText = "SafariDark is installed but not enabled in Safari Settings.";
-        document.getElementsByClassName("state-error")[0].innerText = "SafariDark could not read the current extension state. You can still check it in Safari Settings.";
-        document.getElementsByClassName("open-preferences")[0].innerText = "Open Safari Settings";
+        setText(".open-preferences", "Open Safari Settings");
+        setText(".status-detail", "Open Safari Settings to enable or review the extension.");
+        setText(".steps li:first-child p", "Open Safari Settings, turn on SafariDark, then allow it on the websites you want to darken.");
+    } else {
+        setText(".open-preferences", "Open Safari Preferences");
+        setText(".status-detail", "Open Safari Preferences to enable or review the extension.");
+        setText(".steps li:first-child p", "Open Safari Preferences, turn on SafariDark, then allow it on the websites you want to darken.");
     }
 
     if (["on", "off", "error"].includes(state)) {
@@ -23,7 +38,13 @@ function show(enabled, useSettingsInsteadOfPreferences) {
 }
 
 function openPreferences() {
+    setText("#action-message", "");
     webkit.messageHandlers.controller.postMessage("open-preferences");
+}
+
+function showOpenSettingsError() {
+    const manualPath = settingsName === "Safari Settings" ? "Safari > Settings > Extensions" : "Safari > Preferences > Extensions";
+    setText("#action-message", `${settingsName} did not open. Open ${manualPath} manually.`);
 }
 
 document.querySelector("button.open-preferences").addEventListener("click", openPreferences);

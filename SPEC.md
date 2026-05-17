@@ -99,12 +99,14 @@
 需求：
 
 - 展示扩展可用、已启用、未启用或查询失败状态。
+- 展示简短使用引导：在 Safari Settings 启用扩展、允许网站、通过 toolbar popup 调整模式和当前网站。
 - 提供打开 Safari Settings 的主操作。
 - 保持职责聚焦，不把 host app 做成完整设置中心。
 
 验收：
 
 - 用户能从 host app 跳转到 Safari Settings。
+- 用户能在 host app 中理解启用扩展、打开 toolbar popup 和调整当前网站的基本流程。
 - 扩展状态展示与 Safari 实际状态一致或能合理降级。
 
 ### 阶段 3：Manifest 与注入
@@ -231,6 +233,7 @@
 - popup 设置即时生效。
 - host app 扩展状态展示。
 - host app 打开 Safari Settings。
+- host app 使用引导覆盖启用、toolbar popup 和当前网站调节流程。
 - 可选悬浮控件默认关闭、启用、拖动、隐藏和恢复。
 
 ## 7. 完成标准

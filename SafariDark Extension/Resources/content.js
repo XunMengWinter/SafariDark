@@ -8,7 +8,11 @@
     const BACKGROUND_MEDIA_CLASS = "safaridark-background-media";
     const BACKGROUND_CONTENT_CLASS = "safaridark-background-content";
     const MAX_REPAIR_ELEMENTS = 350;
-    const MEDIA_SELECTOR = "img, picture, video, canvas, svg, iframe, object, embed, [role=\"img\"]";
+    const MIN_BACKGROUND_MEDIA_AREA = 1800;
+    const LARGE_BACKGROUND_CONTAINER_AREA = 24000;
+    const MAX_BACKGROUND_CONTAINER_TEXT_LENGTH = 80;
+    const MEDIA_SELECTOR = "img, video, canvas, svg, iframe, object, embed, [role=\"img\"]";
+    const IMMEDIATE_MEDIA_SELECTOR = "img, video, canvas, svg, iframe, object, embed";
     const INTERNAL_CLASS_NAMES = [
         PRESERVE_MEDIA_CLASS,
         BACKGROUND_MEDIA_CLASS,
@@ -341,6 +345,7 @@
                 background-color: #fff !important;
             }
 
+            ${scopedSelector("html[data-safaridark-active]", IMMEDIATE_MEDIA_SELECTOR)},
             html[data-safaridark-active] .${PRESERVE_MEDIA_CLASS} {
                 filter: var(--safaridark-counter-filter) !important;
             }
@@ -377,6 +382,13 @@
         document.documentElement?.removeAttribute("data-safaridark-active");
     }
 
+    function scopedSelector(scope, selectorList) {
+        return selectorList
+            .split(",")
+            .map((selector) => `${scope} ${selector.trim()}`)
+            .join(",\n            ");
+    }
+
     function markVisualMedia() {
         if (!document.body) {
             return;
@@ -385,7 +397,7 @@
         const marked = new Set();
 
         for (const element of Array.from(document.body.querySelectorAll("*"))) {
-            if (shouldSkipVisualElement(element) || !hasVisualBackground(element) || hasPreserveAncestorWithoutReapply(element, marked)) {
+            if (shouldSkipVisualElement(element) || !hasPreservableBackgroundImage(element) || hasPreserveAncestorWithoutReapply(element, marked)) {
                 continue;
             }
 
@@ -409,7 +421,7 @@
 
     function markBackgroundContent(element, marked) {
         for (const child of Array.from(element.children)) {
-            if (shouldSkipVisualElement(child) || isVisualMediaElement(child) || hasVisualBackground(child)) {
+            if (shouldSkipVisualElement(child) || isVisualMediaElement(child) || hasPreservableBackgroundImage(child)) {
                 continue;
             }
 
@@ -448,9 +460,52 @@
         return element.matches?.(MEDIA_SELECTOR) || false;
     }
 
-    function hasVisualBackground(element) {
-        const backgroundImage = safeComputedStyle(element)?.backgroundImage;
-        return typeof backgroundImage === "string" && /\burl\(|image-set\(/i.test(backgroundImage);
+    function hasPreservableBackgroundImage(element) {
+        const style = safeComputedStyle(element);
+        const backgroundImage = style?.backgroundImage;
+        if (typeof backgroundImage !== "string" || !/\burl\(|image-set\(/i.test(backgroundImage)) {
+            return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        if (area < MIN_BACKGROUND_MEDIA_AREA) {
+            return false;
+        }
+
+        if (!hasScaledBackground(style) && hasRepeatingBackground(style)) {
+            return false;
+        }
+
+        if (isLargeTextContainer(element, style, area)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function hasScaledBackground(style) {
+        const size = `${style?.backgroundSize || ""}`.toLowerCase();
+        return /\bcover\b|\bcontain\b|(?:^|[\s,])(?:\d+(?:\.\d+)?%|calc\()/i.test(size);
+    }
+
+    function hasRepeatingBackground(style) {
+        const repeat = [
+            style?.backgroundRepeat,
+            style?.backgroundRepeatX,
+            style?.backgroundRepeatY
+        ].filter(Boolean).join(" ").toLowerCase();
+        const tokens = repeat.split(/[\s,]+/).filter(Boolean);
+        return tokens.some((token) => ["repeat", "repeat-x", "repeat-y", "space", "round"].includes(token));
+    }
+
+    function isLargeTextContainer(element, style, area) {
+        if (area < LARGE_BACKGROUND_CONTAINER_AREA || hasScaledBackground(style)) {
+            return false;
+        }
+
+        const text = element.textContent?.trim().replace(/\s+/g, " ") || "";
+        return text.length > MAX_BACKGROUND_CONTAINER_TEXT_LENGTH && element.childElementCount > 0;
     }
 
     function hasPreserveAncestorWithoutReapply(element, marked) {

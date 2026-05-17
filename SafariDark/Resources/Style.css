@@ -7,7 +7,19 @@
 :root {
     color-scheme: light dark;
 
-    --spacing: 20px;
+    --accent: #0a84ff;
+    --accent-text: white;
+    --border: color-mix(in srgb, CanvasText 16%, transparent);
+    --muted: color-mix(in srgb, CanvasText 64%, transparent);
+    --panel: color-mix(in srgb, Canvas 88%, CanvasText 5%);
+    --spacing: 24px;
+}
+
+@supports (color: AccentColor) {
+    :root {
+        --accent: AccentColor;
+        --accent-text: AccentColorText;
+    }
 }
 
 html {
@@ -15,17 +27,54 @@ html {
 }
 
 body {
+    box-sizing: border-box;
+    min-height: 100%;
+    margin: 0;
+    padding: var(--spacing);
+
+    color: CanvasText;
+    background: Canvas;
+    font: -apple-system-body;
+}
+
+.shell {
     display: flex;
+    gap: var(--spacing);
     align-items: center;
     justify-content: center;
+
+    width: min(100%, 680px);
+    min-height: calc(100vh - (var(--spacing) * 2));
+    margin: 0 auto;
+}
+
+.intro,
+.guide {
+    box-sizing: border-box;
+}
+
+.intro {
+    display: flex;
+    flex: 0 0 260px;
     flex-direction: column;
-
+    align-items: center;
     gap: 12px;
-    margin: 0 calc(var(--spacing) * 2);
-    height: 100%;
-
-    font: -apple-system-short-body;
     text-align: center;
+}
+
+.guide {
+    flex: 1 1 auto;
+}
+
+img {
+    border-radius: 20px;
+}
+
+.eyebrow {
+    margin: 0;
+    color: var(--muted);
+    font: -apple-system-footnote;
+    font-weight: 600;
 }
 
 h1 {
@@ -34,13 +83,81 @@ h1 {
     font-weight: 700;
 }
 
+h2 {
+    margin: 0 0 12px;
+    font: -apple-system-headline;
+}
+
+h3 {
+    margin: 0 0 4px;
+    font: -apple-system-body;
+    font-weight: 600;
+}
+
 p {
-    max-width: 420px;
     margin: 0;
 }
 
+.status-card,
+.notes {
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+}
+
+.status-card {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+
+    width: 100%;
+    padding: 12px;
+    text-align: left;
+}
+
+.state-unknown,
+.state-on,
+.state-off,
+.state-error {
+    font-weight: 600;
+}
+
+.status-detail {
+    margin-top: 3px;
+    color: var(--muted);
+    font: -apple-system-footnote;
+}
+
+.status-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #8e8e93;
+}
+
+body[data-state="on"] .status-dot {
+    background: #34c759;
+}
+
+body[data-state="off"] .status-dot {
+    background: #ff9500;
+}
+
+body[data-state="error"] .status-dot {
+    background: #ff3b30;
+}
+
 .privacy-note {
-    color: color-mix(in srgb, CanvasText 64%, transparent);
+    color: var(--muted);
+    font: -apple-system-footnote;
+}
+
+.action-message {
+    min-height: 16px;
+    color: #ff3b30;
     font: -apple-system-footnote;
 }
 
@@ -61,6 +178,80 @@ body[data-state="error"] :is(.state-on, .state-off, .state-unknown) {
 }
 
 button {
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 16px;
+
+    color: var(--accent-text);
+    background: var(--accent);
     font-size: 1em;
-    padding: 7px 14px;
+}
+
+button:active {
+    filter: brightness(0.92);
+}
+
+.steps {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.steps li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: flex-start;
+
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+}
+
+.step-index {
+    display: inline-grid;
+    place-items: center;
+
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+
+    color: var(--accent-text);
+    background: var(--accent);
+    font: -apple-system-caption1;
+    font-weight: 700;
+}
+
+.steps p,
+.notes li {
+    color: var(--muted);
+    font: -apple-system-footnote;
+    line-height: 1.35;
+}
+
+.notes {
+    margin-top: 14px;
+    padding: 12px;
+}
+
+.notes ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 18px;
+}
+
+@media (max-width: 620px) {
+    .shell {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+    }
+
+    .intro {
+        flex-basis: auto;
+    }
 }

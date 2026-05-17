@@ -10,13 +10,64 @@
     <script src="../Script.js" defer></script>
 </head>
 <body>
-    <img src="../Icon.png" width="128" height="128" alt="SafariDark Icon">
-    <h1>SafariDark</h1>
-    <p class="state-unknown">SafariDark can darken webpages locally after you enable the extension in Safari.</p>
-    <p class="state-on">SafariDark is enabled in Safari.</p>
-    <p class="state-off">SafariDark is installed but not enabled in Safari.</p>
-    <p class="state-error">SafariDark could not read the current extension state. You can still check it in Safari Settings.</p>
-    <p class="privacy-note">Settings stay on this Mac. SafariDark does not upload webpage content.</p>
-    <button class="open-preferences">Open Safari Settings</button>
+    <main class="shell">
+        <section class="intro" aria-labelledby="app-title">
+            <img src="../Icon.png" width="96" height="96" alt="SafariDark Icon">
+            <p class="eyebrow">Safari Web Extension</p>
+            <h1 id="app-title">SafariDark</h1>
+
+            <div class="status-card" role="status" aria-live="polite">
+                <span class="status-dot" aria-hidden="true"></span>
+                <div>
+                    <p class="state-unknown">Checking SafariDark status in Safari.</p>
+                    <p class="state-on">SafariDark is enabled in Safari.</p>
+                    <p class="state-off">SafariDark is installed but not enabled in Safari.</p>
+                    <p class="state-error">SafariDark could not read the current extension state.</p>
+                    <p class="status-detail">Open Safari Settings to enable or review the extension.</p>
+                </div>
+            </div>
+
+            <button class="open-preferences" type="button">Open Safari Settings</button>
+            <p id="action-message" class="action-message" role="status" aria-live="polite"></p>
+            <p class="privacy-note">Settings stay on this Mac. SafariDark does not upload webpage content.</p>
+        </section>
+
+        <section class="guide" aria-labelledby="guide-title">
+            <h2 id="guide-title">Use SafariDark</h2>
+
+            <ol class="steps">
+                <li>
+                    <span class="step-index">1</span>
+                    <div>
+                        <h3>Enable the extension</h3>
+                        <p>Open Safari Settings, turn on SafariDark, then allow it on the websites you want to darken.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-index">2</span>
+                    <div>
+                        <h3>Use the toolbar popup</h3>
+                        <p>Click the SafariDark toolbar icon in Safari to choose Dark, Original, or Auto.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-index">3</span>
+                    <div>
+                        <h3>Tune the current site</h3>
+                        <p>Use the popup to disable one site, skip pages that are already dark, or adjust brightness, contrast, and sepia.</p>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="notes">
+                <h2>Local by default</h2>
+                <ul>
+                    <li>Darkening runs in Safari on this Mac.</li>
+                    <li>Preferences are saved in Safari extension storage.</li>
+                    <li>The optional page control stays off until you enable it.</li>
+                </ul>
+            </div>
+        </section>
+    </main>
 </body>
 </html>

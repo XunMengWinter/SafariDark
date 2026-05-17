@@ -45,13 +45,17 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if (message.body as! String != "open-preferences") {
-            return;
+        guard let command = message.body as? String, command == "open-preferences" else {
+            return
         }
 
         SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { error in
             DispatchQueue.main.async {
-                NSApplication.shared.terminate(nil)
+                if error == nil {
+                    NSApplication.shared.terminate(nil)
+                } else {
+                    self.webView.evaluateJavaScript("showOpenSettingsError()")
+                }
             }
         }
     }
