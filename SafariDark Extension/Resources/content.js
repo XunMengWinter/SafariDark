@@ -4,7 +4,18 @@
     const EARLY_STYLE_ID = "safaridark-early-style";
     const APPLY_MESSAGE = "safaridark.applySettings";
     const CSS_FETCH_MESSAGE = "safaridark.fetchCss";
+    const PRESERVE_MEDIA_CLASS = "safaridark-preserve-media";
+    const BACKGROUND_MEDIA_CLASS = "safaridark-background-media";
+    const BACKGROUND_CONTENT_CLASS = "safaridark-background-content";
     const MAX_REPAIR_ELEMENTS = 350;
+    const MEDIA_SELECTOR = "img, picture, video, canvas, svg, iframe, object, embed, [role=\"img\"]";
+    const INTERNAL_CLASS_NAMES = [
+        PRESERVE_MEDIA_CLASS,
+        BACKGROUND_MEDIA_CLASS,
+        BACKGROUND_CONTENT_CLASS,
+        "safaridark-repair-light-bg",
+        "safaridark-repair-dark-bg"
+    ];
 
     const DEFAULT_SETTINGS = {
         mode: "dark",
@@ -104,7 +115,11 @@
                     return;
                 }
 
-                const observer = new MutationObserver(() => {
+                const observer = new MutationObserver((mutations) => {
+                    if (mutations.length > 0 && mutations.every(isInternalMutation)) {
+                        return;
+                    }
+
                     clearTimeout(this.mutationTimer);
                     this.mutationTimer = setTimeout(() => {
                         this.apply();
@@ -113,6 +128,9 @@
                 });
 
                 observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ["class", "style", "src", "srcset", "data-src", "data-srcset"],
+                    attributeOldValue: true,
                     childList: true,
                     subtree: true
                 });
@@ -132,10 +150,12 @@
 
             if (active) {
                 installRuntimeStyle(this.settings);
+                markVisualMedia();
                 this.scheduleContrastRepair();
             } else {
                 removeRuntimeStyle();
                 clearContrastRepair();
+                clearMediaMarks();
             }
 
             removeEarlyStyle();
@@ -292,7 +312,7 @@
             appendToDocument(style);
         }
 
-        const filter = [
+        const pageFilter = [
             "invert(1)",
             "hue-rotate(180deg)",
             `brightness(${settings.brightness}%)`,
@@ -300,35 +320,38 @@
             `sepia(${settings.sepia}%)`
         ].join(" ");
 
-        const mediaFilter = [
-            "invert(1)",
-            "hue-rotate(180deg)",
-            `brightness(${Math.round(10000 / settings.brightness)}%)`,
+        const counterFilter = [
+            "sepia(0%)",
             `contrast(${Math.round(10000 / settings.contrast)}%)`,
-            `sepia(0%)`
+            `brightness(${Math.round(10000 / settings.brightness)}%)`,
+            "hue-rotate(180deg)",
+            "invert(1)"
         ].join(" ");
 
         style.textContent = `
             html[data-safaridark-active] {
+                --safaridark-page-filter: ${pageFilter};
+                --safaridark-counter-filter: ${counterFilter};
                 background: #fff !important;
                 color-scheme: dark !important;
-                filter: ${filter} !important;
+                filter: var(--safaridark-page-filter) !important;
             }
 
             html[data-safaridark-active] body {
                 background-color: #fff !important;
             }
 
-            html[data-safaridark-active] img,
-            html[data-safaridark-active] picture,
-            html[data-safaridark-active] video,
-            html[data-safaridark-active] canvas,
-            html[data-safaridark-active] iframe,
-            html[data-safaridark-active] svg,
-            html[data-safaridark-active] [style*="background-image"],
-            html[data-safaridark-active] [class*="icon"],
-            html[data-safaridark-active] [class*="avatar"] {
-                filter: ${mediaFilter} !important;
+            html[data-safaridark-active] .${PRESERVE_MEDIA_CLASS} {
+                filter: var(--safaridark-counter-filter) !important;
+            }
+
+            html[data-safaridark-active] .${BACKGROUND_MEDIA_CLASS} > .${BACKGROUND_CONTENT_CLASS} {
+                filter: var(--safaridark-page-filter) !important;
+            }
+
+            html[data-safaridark-active] .${BACKGROUND_MEDIA_CLASS} > .${BACKGROUND_CONTENT_CLASS}.${PRESERVE_MEDIA_CLASS},
+            html[data-safaridark-active] .${BACKGROUND_MEDIA_CLASS} > .${BACKGROUND_CONTENT_CLASS} .${PRESERVE_MEDIA_CLASS} {
+                filter: var(--safaridark-counter-filter) !important;
             }
 
             html[data-safaridark-active] input,
@@ -352,6 +375,99 @@
     function removeRuntimeStyle() {
         document.getElementById(STYLE_ID)?.remove();
         document.documentElement?.removeAttribute("data-safaridark-active");
+    }
+
+    function markVisualMedia() {
+        if (!document.body) {
+            return;
+        }
+
+        const marked = new Set();
+
+        for (const element of Array.from(document.body.querySelectorAll("*"))) {
+            if (shouldSkipVisualElement(element) || !hasVisualBackground(element) || hasPreserveAncestorWithoutReapply(element, marked)) {
+                continue;
+            }
+
+            element.classList.add(PRESERVE_MEDIA_CLASS, BACKGROUND_MEDIA_CLASS);
+            marked.add(element);
+            markBackgroundContent(element, marked);
+        }
+
+        for (const element of Array.from(document.querySelectorAll(MEDIA_SELECTOR))) {
+            if (shouldSkipVisualElement(element) || hasPreserveAncestorWithoutReapply(element, marked)) {
+                continue;
+            }
+
+            element.classList.add(PRESERVE_MEDIA_CLASS);
+            element.classList.remove(BACKGROUND_MEDIA_CLASS);
+            marked.add(element);
+        }
+
+        cleanupMediaMarks(marked);
+    }
+
+    function markBackgroundContent(element, marked) {
+        for (const child of Array.from(element.children)) {
+            if (shouldSkipVisualElement(child) || isVisualMediaElement(child) || hasVisualBackground(child)) {
+                continue;
+            }
+
+            child.classList.add(BACKGROUND_CONTENT_CLASS);
+            marked.add(child);
+        }
+    }
+
+    function cleanupMediaMarks(marked) {
+        document.querySelectorAll(`.${PRESERVE_MEDIA_CLASS}, .${BACKGROUND_MEDIA_CLASS}, .${BACKGROUND_CONTENT_CLASS}`).forEach((element) => {
+            if (marked.has(element)) {
+                return;
+            }
+
+            element.classList.remove(PRESERVE_MEDIA_CLASS, BACKGROUND_MEDIA_CLASS, BACKGROUND_CONTENT_CLASS);
+        });
+    }
+
+    function clearMediaMarks() {
+        cleanupMediaMarks(new Set());
+    }
+
+    function shouldSkipVisualElement(element) {
+        if (!(element instanceof Element)) {
+            return true;
+        }
+
+        if (isSafariDarkOwnedElement(element)) {
+            return true;
+        }
+
+        return ["HTML", "HEAD", "BODY", "SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT", "TEMPLATE"].includes(element.tagName);
+    }
+
+    function isVisualMediaElement(element) {
+        return element.matches?.(MEDIA_SELECTOR) || false;
+    }
+
+    function hasVisualBackground(element) {
+        const backgroundImage = safeComputedStyle(element)?.backgroundImage;
+        return typeof backgroundImage === "string" && /\burl\(|image-set\(/i.test(backgroundImage);
+    }
+
+    function hasPreserveAncestorWithoutReapply(element, marked) {
+        let current = element.parentElement;
+        while (current && current !== document.documentElement) {
+            if (current.classList?.contains(BACKGROUND_CONTENT_CLASS)) {
+                return false;
+            }
+
+            if (marked.has(current) || current.classList?.contains(PRESERVE_MEDIA_CLASS)) {
+                return true;
+            }
+
+            current = current.parentElement;
+        }
+
+        return false;
     }
 
     function appendToDocument(node) {
@@ -729,5 +845,49 @@
 
         const rect = element.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
+    }
+
+    function isInternalMutation(mutation) {
+        if (mutation.type === "childList") {
+            const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+            return nodes.length > 0 && nodes.every(isSafariDarkOwnedNode);
+        }
+
+        if (mutation.type !== "attributes") {
+            return false;
+        }
+
+        if (isSafariDarkOwnedElement(mutation.target)) {
+            return true;
+        }
+
+        if (mutation.attributeName === "class") {
+            return stripInternalClasses(mutation.oldValue || "") === stripInternalClasses(mutation.target.getAttribute("class") || "");
+        }
+
+        return false;
+    }
+
+    function stripInternalClasses(value) {
+        return value
+            .split(/\s+/)
+            .filter((className) => className && !INTERNAL_CLASS_NAMES.includes(className))
+            .sort()
+            .join(" ");
+    }
+
+    function isSafariDarkOwnedNode(node) {
+        if (!(node instanceof Element)) {
+            return false;
+        }
+
+        return isSafariDarkOwnedElement(node);
+    }
+
+    function isSafariDarkOwnedElement(element) {
+        return element.id === STYLE_ID
+            || element.id === EARLY_STYLE_ID
+            || element.id === "safaridark-floating-control"
+            || Boolean(element.closest?.("#safaridark-floating-control"));
     }
 })();
