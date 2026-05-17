@@ -1,10 +1,10 @@
 {
     "extension_name": {
-        "message": "SafariDark Extension",
+        "message": "SafariDark",
         "description": "The display name for the extension."
     },
     "extension_description": {
-        "message": "This is SafariDark Extension. You should tell us what your extension does here.",
+        "message": "Darkens webpages locally with per-site controls and adjustable brightness, contrast, and sepia.",
         "description": "Description of what the extension does."
     }
 }

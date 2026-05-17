@@ -20,7 +20,7 @@ body {
     justify-content: center;
     flex-direction: column;
 
-    gap: var(--spacing);
+    gap: 12px;
     margin: 0 calc(var(--spacing) * 2);
     height: 100%;
 
@@ -28,18 +28,39 @@ body {
     text-align: center;
 }
 
-body:not(.state-on, .state-off) :is(.state-on, .state-off) {
+h1 {
+    margin: 0;
+    font: -apple-system-title2;
+    font-weight: 700;
+}
+
+p {
+    max-width: 420px;
+    margin: 0;
+}
+
+.privacy-note {
+    color: color-mix(in srgb, CanvasText 64%, transparent);
+    font: -apple-system-footnote;
+}
+
+body:not([data-state]) :is(.state-on, .state-off, .state-error) {
     display: none;
 }
 
-body.state-on :is(.state-off, .state-unknown) {
+body[data-state="on"] :is(.state-off, .state-unknown, .state-error) {
     display: none;
 }
 
-body.state-off :is(.state-on, .state-unknown) {
+body[data-state="off"] :is(.state-on, .state-unknown, .state-error) {
+    display: none;
+}
+
+body[data-state="error"] :is(.state-on, .state-off, .state-unknown) {
     display: none;
 }
 
 button {
     font-size: 1em;
+    padding: 7px 14px;
 }

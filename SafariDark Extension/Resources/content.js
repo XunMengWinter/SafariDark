@@ -1,7 +1,733 @@
-browser.runtime.sendMessage({ greeting: "hello" }).then((response) => {
-    console.log("Received response: ", response);
-});
+(() => {
+    const CONTROLLER_KEY = "__safaridarkController";
+    const STYLE_ID = "safaridark-runtime-style";
+    const EARLY_STYLE_ID = "safaridark-early-style";
+    const APPLY_MESSAGE = "safaridark.applySettings";
+    const CSS_FETCH_MESSAGE = "safaridark.fetchCss";
+    const MAX_REPAIR_ELEMENTS = 350;
 
-browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log("Received request: ", request);
-});
+    const DEFAULT_SETTINGS = {
+        mode: "dark",
+        skipDarkSites: true,
+        brightness: 100,
+        contrast: 105,
+        sepia: 0,
+        disabledHosts: [],
+        floatingControlEnabled: false,
+        floatingControlHiddenHosts: [],
+        floatingControlPosition: { x: 16, y: 16 }
+    };
+
+    if (window[CONTROLLER_KEY]) {
+        window[CONTROLLER_KEY].refreshFromStorage();
+        return;
+    }
+
+    installEarlyStyle();
+
+    const controller = {
+        settings: { ...DEFAULT_SETTINGS },
+        hostname: effectiveHostname(),
+        stylesheetText: "",
+        fetchedCssUrls: new Set(),
+        fetchInFlight: false,
+        mutationTimer: 0,
+        repairTimer: 0,
+        floatingControl: null,
+        systemDarkQuery: window.matchMedia?.("(prefers-color-scheme: dark)") || null,
+
+        async start() {
+            this.bindMessages();
+            this.bindSystemAppearance();
+            this.bindMutations();
+            await this.refreshFromStorage();
+            this.collectStylesheetText();
+        },
+
+        async refreshFromStorage() {
+            try {
+                const stored = await browser.storage.local.get(DEFAULT_SETTINGS);
+                this.settings = normalizeSettings(stored);
+                this.apply();
+            } catch {
+                removeEarlyStyle();
+            }
+        },
+
+        bindMessages() {
+            browser.runtime.onMessage.addListener((request) => {
+                if (request?.type !== APPLY_MESSAGE) {
+                    return undefined;
+                }
+
+                this.settings = normalizeSettings(request.settings);
+                this.apply();
+                this.collectStylesheetText();
+                return Promise.resolve({ ok: true });
+            });
+
+            browser.storage.onChanged?.addListener((changes, areaName) => {
+                if (areaName !== "local") {
+                    return;
+                }
+
+                const changedSettings = {};
+                for (const key of Object.keys(DEFAULT_SETTINGS)) {
+                    if (Object.prototype.hasOwnProperty.call(changes, key)) {
+                        changedSettings[key] = changes[key].newValue;
+                    }
+                }
+
+                if (Object.keys(changedSettings).length > 0) {
+                    this.settings = normalizeSettings({ ...this.settings, ...changedSettings });
+                    this.apply();
+                }
+            });
+        },
+
+        bindSystemAppearance() {
+            if (!this.systemDarkQuery) {
+                return;
+            }
+
+            const listener = () => this.apply();
+            if (this.systemDarkQuery.addEventListener) {
+                this.systemDarkQuery.addEventListener("change", listener);
+            } else if (this.systemDarkQuery.addListener) {
+                this.systemDarkQuery.addListener(listener);
+            }
+        },
+
+        bindMutations() {
+            const startObserver = () => {
+                if (!document.documentElement) {
+                    return;
+                }
+
+                const observer = new MutationObserver(() => {
+                    clearTimeout(this.mutationTimer);
+                    this.mutationTimer = setTimeout(() => {
+                        this.apply();
+                        this.collectStylesheetText();
+                    }, 250);
+                });
+
+                observer.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true
+                });
+            };
+
+            if (document.documentElement) {
+                startObserver();
+            } else {
+                document.addEventListener("DOMContentLoaded", startObserver, { once: true });
+            }
+        },
+
+        apply() {
+            const active = this.shouldDarken();
+            document.documentElement?.toggleAttribute("data-safaridark-active", active);
+            document.documentElement?.toggleAttribute("data-safaridark-ready", true);
+
+            if (active) {
+                installRuntimeStyle(this.settings);
+                this.scheduleContrastRepair();
+            } else {
+                removeRuntimeStyle();
+                clearContrastRepair();
+            }
+
+            removeEarlyStyle();
+            this.renderFloatingControl(active);
+        },
+
+        shouldDarken() {
+            if (this.settings.mode === "original") {
+                return false;
+            }
+
+            if (this.hostname && this.settings.disabledHosts.includes(this.hostname)) {
+                return false;
+            }
+
+            if (this.settings.mode === "auto" && !this.systemDarkQuery?.matches) {
+                return false;
+            }
+
+            if (this.settings.skipDarkSites && this.isAlreadyDarkSite()) {
+                return false;
+            }
+
+            return true;
+        },
+
+        isAlreadyDarkSite() {
+            const rootStyle = safeComputedStyle(document.documentElement);
+            const bodyStyle = safeComputedStyle(document.body);
+            const background = firstOpaqueColor(
+                rootStyle?.backgroundColor,
+                bodyStyle?.backgroundColor,
+                bodyStyle?.background,
+                rootStyle?.background
+            );
+            const foreground = firstOpaqueColor(bodyStyle?.color, rootStyle?.color);
+            const colorScheme = [
+                document.documentElement?.style?.colorScheme,
+                document.body?.style?.colorScheme,
+                rootStyle?.colorScheme,
+                bodyStyle?.colorScheme
+            ].join(" ");
+
+            if (background && foreground) {
+                const backgroundLum = luminance(background);
+                const foregroundLum = luminance(foreground);
+                if (backgroundLum < 0.22 && foregroundLum > 0.48) {
+                    return true;
+                }
+            }
+
+            if (/\bcolor-scheme\s*:\s*dark\b/i.test(this.stylesheetText) && background && luminance(background) < 0.32) {
+                return true;
+            }
+
+            return /\bdark\b/i.test(colorScheme) && background && luminance(background) < 0.28;
+        },
+
+        async collectStylesheetText() {
+            if (this.fetchInFlight) {
+                return;
+            }
+
+            this.fetchInFlight = true;
+            const parts = [];
+            const fetches = [];
+
+            for (const sheet of Array.from(document.styleSheets)) {
+                try {
+                    if (sheet.cssRules) {
+                        parts.push(Array.from(sheet.cssRules).map((rule) => rule.cssText).join("\n"));
+                    }
+                } catch {
+                    if (sheet.href && !this.fetchedCssUrls.has(sheet.href)) {
+                        this.fetchedCssUrls.add(sheet.href);
+                        fetches.push(fetchStylesheet(sheet.href));
+                    }
+                }
+            }
+
+            const fetched = await Promise.all(fetches);
+            for (const result of fetched) {
+                if (result) {
+                    parts.push(result);
+                }
+            }
+
+            this.stylesheetText = parts.join("\n").slice(0, 500_000);
+            this.fetchInFlight = false;
+            this.apply();
+        },
+
+        scheduleContrastRepair() {
+            clearTimeout(this.repairTimer);
+            this.repairTimer = setTimeout(() => repairLowContrastText(), 180);
+        },
+
+        renderFloatingControl(active) {
+            const shouldShow = window.top === window
+                && this.settings.floatingControlEnabled
+                && this.hostname
+                && !this.settings.floatingControlHiddenHosts.includes(this.hostname);
+
+            if (!shouldShow) {
+                this.floatingControl?.destroy();
+                this.floatingControl = null;
+                return;
+            }
+
+            if (!this.floatingControl) {
+                this.floatingControl = createFloatingControl({
+                    settings: this.settings,
+                    hostname: this.hostname,
+                    active,
+                    onChange: async (nextSettings) => {
+                        this.settings = normalizeSettings(nextSettings);
+                        await browser.storage.local.set(this.settings);
+                        this.apply();
+                    }
+                });
+            } else {
+                this.floatingControl.update(this.settings, active);
+            }
+        }
+    };
+
+    window[CONTROLLER_KEY] = controller;
+    controller.start();
+
+    function installEarlyStyle() {
+        if (document.getElementById(EARLY_STYLE_ID)) {
+            return;
+        }
+
+        const style = document.createElement("style");
+        style.id = EARLY_STYLE_ID;
+        style.textContent = `
+            html:not([data-safaridark-ready]) {
+                background: #101113 !important;
+            }
+        `;
+        appendToDocument(style);
+    }
+
+    function removeEarlyStyle() {
+        document.getElementById(EARLY_STYLE_ID)?.remove();
+    }
+
+    function installRuntimeStyle(settings) {
+        let style = document.getElementById(STYLE_ID);
+        if (!style) {
+            style = document.createElement("style");
+            style.id = STYLE_ID;
+            appendToDocument(style);
+        }
+
+        const filter = [
+            "invert(1)",
+            "hue-rotate(180deg)",
+            `brightness(${settings.brightness}%)`,
+            `contrast(${settings.contrast}%)`,
+            `sepia(${settings.sepia}%)`
+        ].join(" ");
+
+        const mediaFilter = [
+            "invert(1)",
+            "hue-rotate(180deg)",
+            `brightness(${Math.round(10000 / settings.brightness)}%)`,
+            `contrast(${Math.round(10000 / settings.contrast)}%)`,
+            `sepia(0%)`
+        ].join(" ");
+
+        style.textContent = `
+            html[data-safaridark-active] {
+                background: #fff !important;
+                color-scheme: dark !important;
+                filter: ${filter} !important;
+            }
+
+            html[data-safaridark-active] body {
+                background-color: #fff !important;
+            }
+
+            html[data-safaridark-active] img,
+            html[data-safaridark-active] picture,
+            html[data-safaridark-active] video,
+            html[data-safaridark-active] canvas,
+            html[data-safaridark-active] iframe,
+            html[data-safaridark-active] svg,
+            html[data-safaridark-active] [style*="background-image"],
+            html[data-safaridark-active] [class*="icon"],
+            html[data-safaridark-active] [class*="avatar"] {
+                filter: ${mediaFilter} !important;
+            }
+
+            html[data-safaridark-active] input,
+            html[data-safaridark-active] textarea,
+            html[data-safaridark-active] select,
+            html[data-safaridark-active] button {
+                background-color: #fff !important;
+                color: #111 !important;
+            }
+
+            html[data-safaridark-active] .safaridark-repair-light-bg {
+                color: #111 !important;
+            }
+
+            html[data-safaridark-active] .safaridark-repair-dark-bg {
+                color: #f2f2f2 !important;
+            }
+        `;
+    }
+
+    function removeRuntimeStyle() {
+        document.getElementById(STYLE_ID)?.remove();
+        document.documentElement?.removeAttribute("data-safaridark-active");
+    }
+
+    function appendToDocument(node) {
+        const parent = document.head || document.documentElement || document.body;
+        if (parent) {
+            parent.appendChild(node);
+        } else {
+            document.addEventListener("DOMContentLoaded", () => appendToDocument(node), { once: true });
+        }
+    }
+
+    function clearContrastRepair() {
+        document.querySelectorAll(".safaridark-repair-light-bg, .safaridark-repair-dark-bg").forEach((element) => {
+            element.classList.remove("safaridark-repair-light-bg", "safaridark-repair-dark-bg");
+        });
+    }
+
+    function repairLowContrastText() {
+        if (!document.body || !document.documentElement?.hasAttribute("data-safaridark-active")) {
+            return;
+        }
+
+        clearContrastRepair();
+        const selector = "a, button, dd, div, dt, h1, h2, h3, h4, h5, h6, input, label, li, p, select, span, td, textarea, th";
+        const elements = Array.from(document.body.querySelectorAll(selector)).slice(0, MAX_REPAIR_ELEMENTS);
+
+        for (const element of elements) {
+            if (!hasTextContent(element) || !isVisible(element)) {
+                continue;
+            }
+
+            const style = safeComputedStyle(element);
+            const foreground = parseColor(style?.color);
+            const background = effectiveBackgroundColor(element);
+            if (!foreground || !background || contrastRatio(foreground, background) >= 3.6) {
+                continue;
+            }
+
+            if (luminance(background) >= 0.5) {
+                element.classList.add("safaridark-repair-light-bg");
+            } else {
+                element.classList.add("safaridark-repair-dark-bg");
+            }
+        }
+    }
+
+    function createFloatingControl(options) {
+        const host = document.createElement("div");
+        host.id = "safaridark-floating-control";
+        host.style.position = "fixed";
+        host.style.zIndex = "2147483647";
+        host.style.left = `${options.settings.floatingControlPosition.x}px`;
+        host.style.top = `${options.settings.floatingControlPosition.y}px`;
+        host.style.width = "42px";
+        host.style.height = "42px";
+        appendToDocument(host);
+
+        const shadow = host.attachShadow({ mode: "closed" });
+        shadow.innerHTML = `
+            <style>
+                :host { all: initial; }
+                .wrap {
+                    position: relative;
+                    font: 13px/1.3 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+                }
+                button {
+                    font: inherit;
+                }
+                .trigger {
+                    width: 42px;
+                    height: 42px;
+                    border: 1px solid rgba(255,255,255,.32);
+                    border-radius: 50%;
+                    background: rgba(20, 22, 26, .72);
+                    color: white;
+                    font-weight: 700;
+                    box-shadow: 0 6px 18px rgba(0,0,0,.18);
+                    -webkit-backdrop-filter: blur(12px);
+                    backdrop-filter: blur(12px);
+                }
+                .menu {
+                    position: absolute;
+                    top: 48px;
+                    left: 0;
+                    display: none;
+                    min-width: 142px;
+                    padding: 6px;
+                    border: 1px solid rgba(0,0,0,.14);
+                    border-radius: 8px;
+                    background: rgba(246,246,246,.92);
+                    box-shadow: 0 10px 26px rgba(0,0,0,.18);
+                    -webkit-backdrop-filter: blur(16px);
+                    backdrop-filter: blur(16px);
+                }
+                .menu.open {
+                    display: grid;
+                    gap: 4px;
+                }
+                .menu button {
+                    width: 100%;
+                    padding: 6px 8px;
+                    border: 0;
+                    border-radius: 6px;
+                    background: transparent;
+                    color: #111;
+                    text-align: left;
+                }
+                .menu button:hover {
+                    background: rgba(0,0,0,.08);
+                }
+            </style>
+            <div class="wrap">
+                <button class="trigger" type="button" aria-label="SafariDark page controls" title="SafariDark">D</button>
+                <div class="menu" role="menu">
+                    <button class="toggle-site" type="button"></button>
+                    <button class="hide-site" type="button">Hide on this site</button>
+                    <button class="close" type="button">Close</button>
+                </div>
+            </div>
+        `;
+
+        const trigger = shadow.querySelector(".trigger");
+        const menu = shadow.querySelector(".menu");
+        const toggleSite = shadow.querySelector(".toggle-site");
+        const hideSite = shadow.querySelector(".hide-site");
+        const close = shadow.querySelector(".close");
+        let settings = normalizeSettings(options.settings);
+        let active = options.active;
+        let drag = null;
+        let moved = false;
+
+        function update(nextSettings, nextActive) {
+            settings = normalizeSettings(nextSettings);
+            active = nextActive;
+            toggleSite.textContent = settings.disabledHosts.includes(options.hostname) ? "Enable here" : "Disable here";
+            trigger.style.background = active ? "rgba(20, 22, 26, .78)" : "rgba(92, 92, 96, .62)";
+            placeControl(settings.floatingControlPosition);
+        }
+
+        function placeControl(position) {
+            host.style.left = `${Math.min(Math.max(position.x, 0), Math.max(0, window.innerWidth - 46))}px`;
+            host.style.top = `${Math.min(Math.max(position.y, 0), Math.max(0, window.innerHeight - 46))}px`;
+        }
+
+        trigger.addEventListener("pointerdown", (event) => {
+            moved = false;
+            drag = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                originX: host.offsetLeft,
+                originY: host.offsetTop
+            };
+            trigger.setPointerCapture(event.pointerId);
+        });
+
+        trigger.addEventListener("pointermove", (event) => {
+            if (!drag || drag.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const dx = event.clientX - drag.startX;
+            const dy = event.clientY - drag.startY;
+            if (Math.abs(dx) + Math.abs(dy) > 4) {
+                moved = true;
+            }
+
+            placeControl({ x: drag.originX + dx, y: drag.originY + dy });
+        });
+
+        trigger.addEventListener("pointerup", async (event) => {
+            if (!drag || drag.pointerId !== event.pointerId) {
+                return;
+            }
+
+            trigger.releasePointerCapture(event.pointerId);
+            drag = null;
+
+            settings.floatingControlPosition = { x: host.offsetLeft, y: host.offsetTop };
+            await options.onChange(settings);
+
+            if (!moved) {
+                menu.classList.toggle("open");
+            }
+        });
+
+        toggleSite.addEventListener("click", async () => {
+            const disabled = settings.disabledHosts.includes(options.hostname);
+            settings.disabledHosts = updateHostList(settings.disabledHosts, options.hostname, !disabled);
+            await options.onChange(settings);
+            update(settings, !settings.disabledHosts.includes(options.hostname));
+        });
+
+        hideSite.addEventListener("click", async () => {
+            settings.floatingControlHiddenHosts = updateHostList(settings.floatingControlHiddenHosts, options.hostname, true);
+            await options.onChange(settings);
+            destroy();
+        });
+
+        close.addEventListener("click", () => menu.classList.remove("open"));
+        window.addEventListener("resize", () => placeControl(settings.floatingControlPosition));
+
+        function destroy() {
+            host.remove();
+        }
+
+        update(settings, active);
+        return { update, destroy };
+    }
+
+    async function fetchStylesheet(url) {
+        try {
+            const response = await browser.runtime.sendMessage({ type: CSS_FETCH_MESSAGE, url });
+            return response?.ok ? response.css : "";
+        } catch {
+            return "";
+        }
+    }
+
+    function normalizeSettings(value) {
+        const normalized = { ...DEFAULT_SETTINGS, ...value };
+        normalized.mode = ["dark", "original", "auto"].includes(normalized.mode) ? normalized.mode : DEFAULT_SETTINGS.mode;
+        normalized.skipDarkSites = Boolean(normalized.skipDarkSites);
+        normalized.brightness = clampNumber(normalized.brightness, 60, 140, DEFAULT_SETTINGS.brightness);
+        normalized.contrast = clampNumber(normalized.contrast, 60, 160, DEFAULT_SETTINGS.contrast);
+        normalized.sepia = clampNumber(normalized.sepia, 0, 60, DEFAULT_SETTINGS.sepia);
+        normalized.disabledHosts = normalizeHostList(normalized.disabledHosts);
+        normalized.floatingControlEnabled = Boolean(normalized.floatingControlEnabled);
+        normalized.floatingControlHiddenHosts = normalizeHostList(normalized.floatingControlHiddenHosts);
+        normalized.floatingControlPosition = normalizePosition(normalized.floatingControlPosition);
+        return normalized;
+    }
+
+    function normalizeHostList(value) {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+
+        return [...new Set(value.filter((host) => typeof host === "string" && host.trim()).map((host) => host.toLowerCase()))];
+    }
+
+    function normalizePosition(value) {
+        if (!value || typeof value !== "object") {
+            return { ...DEFAULT_SETTINGS.floatingControlPosition };
+        }
+
+        return {
+            x: clampNumber(value.x, 0, 10000, DEFAULT_SETTINGS.floatingControlPosition.x),
+            y: clampNumber(value.y, 0, 10000, DEFAULT_SETTINGS.floatingControlPosition.y)
+        };
+    }
+
+    function clampNumber(value, min, max, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return fallback;
+        }
+
+        return Math.min(max, Math.max(min, number));
+    }
+
+    function updateHostList(list, hostname, shouldInclude) {
+        const next = new Set(normalizeHostList(list));
+        if (shouldInclude) {
+            next.add(hostname);
+        } else {
+            next.delete(hostname);
+        }
+
+        return [...next].sort();
+    }
+
+    function effectiveHostname() {
+        for (const value of [window.location.href, document.referrer]) {
+            try {
+                const url = new URL(value);
+                if (url.protocol === "http:" || url.protocol === "https:") {
+                    return url.hostname.toLowerCase();
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        try {
+            return window.top.location.hostname.toLowerCase();
+        } catch {
+            return "";
+        }
+    }
+
+    function safeComputedStyle(element) {
+        if (!element) {
+            return null;
+        }
+
+        try {
+            return getComputedStyle(element);
+        } catch {
+            return null;
+        }
+    }
+
+    function firstOpaqueColor(...values) {
+        for (const value of values) {
+            const color = parseColor(value);
+            if (color && color.a > 0.05) {
+                return color;
+            }
+        }
+
+        return null;
+    }
+
+    function parseColor(value) {
+        if (!value || typeof value !== "string" || value === "transparent") {
+            return null;
+        }
+
+        const rgb = value.match(/rgba?\(([^)]+)\)/i);
+        if (!rgb) {
+            return null;
+        }
+
+        const parts = rgb[1].split(",").map((part) => Number.parseFloat(part.trim()));
+        if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) {
+            return null;
+        }
+
+        return {
+            r: Math.min(255, Math.max(0, parts[0])),
+            g: Math.min(255, Math.max(0, parts[1])),
+            b: Math.min(255, Math.max(0, parts[2])),
+            a: parts.length >= 4 ? Math.min(1, Math.max(0, parts[3])) : 1
+        };
+    }
+
+    function luminance(color) {
+        const values = [color.r, color.g, color.b].map((channel) => {
+            const value = channel / 255;
+            return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+
+        return (0.2126 * values[0]) + (0.7152 * values[1]) + (0.0722 * values[2]);
+    }
+
+    function contrastRatio(a, b) {
+        const lighter = Math.max(luminance(a), luminance(b));
+        const darker = Math.min(luminance(a), luminance(b));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    function effectiveBackgroundColor(element) {
+        let current = element;
+        while (current && current !== document) {
+            const color = parseColor(safeComputedStyle(current)?.backgroundColor);
+            if (color && color.a > 0.05) {
+                return color;
+            }
+            current = current.parentElement;
+        }
+
+        return parseColor("rgb(255, 255, 255)");
+    }
+
+    function hasTextContent(element) {
+        return Boolean(element.textContent && element.textContent.trim().length > 0);
+    }
+
+    function isVisible(element) {
+        const style = safeComputedStyle(element);
+        if (!style || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) {
+            return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+})();

@@ -1,18 +1,25 @@
-function show(enabled, useSettingsInsteadOfPreferences) {
+function showStatus(state, useSettingsInsteadOfPreferences) {
     if (useSettingsInsteadOfPreferences) {
-        document.getElementsByClassName('state-on')[0].innerText = "SafariDark’s extension is currently on. You can turn it off in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('state-off')[0].innerText = "SafariDark’s extension is currently off. You can turn it on in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('state-unknown')[0].innerText = "You can turn on SafariDark’s extension in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('open-preferences')[0].innerText = "Quit and Open Safari Settings…";
+        document.getElementsByClassName("state-unknown")[0].innerText = "SafariDark can darken webpages locally after you enable the extension in Safari Settings.";
+        document.getElementsByClassName("state-off")[0].innerText = "SafariDark is installed but not enabled in Safari Settings.";
+        document.getElementsByClassName("state-error")[0].innerText = "SafariDark could not read the current extension state. You can still check it in Safari Settings.";
+        document.getElementsByClassName("open-preferences")[0].innerText = "Open Safari Settings";
     }
 
-    if (typeof enabled === "boolean") {
-        document.body.classList.toggle(`state-on`, enabled);
-        document.body.classList.toggle(`state-off`, !enabled);
+    if (["on", "off", "error"].includes(state)) {
+        document.body.dataset.state = state;
     } else {
-        document.body.classList.remove(`state-on`);
-        document.body.classList.remove(`state-off`);
+        delete document.body.dataset.state;
     }
+}
+
+function show(enabled, useSettingsInsteadOfPreferences) {
+    if (typeof enabled === "boolean") {
+        showStatus(enabled ? "on" : "off", useSettingsInsteadOfPreferences);
+        return;
+    }
+
+    showStatus("unknown", useSettingsInsteadOfPreferences);
 }
 
 function openPreferences() {

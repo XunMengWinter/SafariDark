@@ -78,19 +78,19 @@
 
 当前项目基线记录：
 
-- Xcode project：`DarkSafari5.xcodeproj`。
-- scheme：`DarkSafari5`。
-- host app target：`DarkSafari5`。
-- extension target：`DarkSafari5 Extension`。
-- host bundle id：`pet.zzz.DarkSafari5`。
-- extension bundle id：`pet.zzz.DarkSafari5.Extension`。
-- host app 入口：`DarkSafari5/AppDelegate.swift`、`DarkSafari5/ViewController.swift`。
-- host app 本地页面资源：`DarkSafari5/Resources/Base.lproj/Main.html`、`DarkSafari5/Resources/Style.css`、`DarkSafari5/Resources/Script.js`。
-- manifest：`DarkSafari5 Extension/Resources/manifest.json`。
-- extension 脚本入口：`DarkSafari5 Extension/Resources/background.js`、`DarkSafari5 Extension/Resources/content.js`、`DarkSafari5 Extension/Resources/popup.js`。
-- popup 资源：`DarkSafari5 Extension/Resources/popup.html`、`DarkSafari5 Extension/Resources/popup.css`。
-- 当前最低系统设置：host app deployment target 为 macOS 26.4，extension deployment target 为 macOS 10.14；本阶段只记录，不调整。
-- Safari Web Extension 能力：通过 `DarkSafari5 Extension/Info.plist` 的 `com.apple.Safari.web-extension` extension point 提供。
+- Xcode project：`SafariDark.xcodeproj`。
+- scheme：`SafariDark`。
+- host app target：`SafariDark`。
+- extension target：`SafariDark Extension`。
+- host bundle id：`pet.zzz.SafariDark`。
+- extension bundle id：`pet.zzz.SafariDark.Extension`。
+- host app 入口：`SafariDark/AppDelegate.swift`、`SafariDark/ViewController.swift`。
+- host app 本地页面资源：`SafariDark/Resources/Base.lproj/Main.html`、`SafariDark/Resources/Style.css`、`SafariDark/Resources/Script.js`。
+- manifest：`SafariDark Extension/Resources/manifest.json`。
+- extension 脚本入口：`SafariDark Extension/Resources/background.js`、`SafariDark Extension/Resources/content.js`、`SafariDark Extension/Resources/popup.js`。
+- popup 资源：`SafariDark Extension/Resources/popup.html`、`SafariDark Extension/Resources/popup.css`。
+- 当前最低系统设置：host app deployment target 为 macOS 14.6，extension deployment target 为 macOS 10.14；本阶段只记录，不调整。
+- Safari Web Extension 能力：通过 `SafariDark Extension/Info.plist` 的 `com.apple.Safari.web-extension` extension point 提供。
 
 ### 阶段 2：Host App
 

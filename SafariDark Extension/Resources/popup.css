@@ -1,15 +1,176 @@
 :root {
     color-scheme: light dark;
+    --bg: Canvas;
+    --fg: CanvasText;
+    --muted: color-mix(in srgb, CanvasText 62%, transparent);
+    --line: color-mix(in srgb, CanvasText 18%, transparent);
+    --control: color-mix(in srgb, CanvasText 8%, transparent);
+    --control-active: AccentColor;
+    --control-active-text: AccentColorText;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
-    width: 100px;
-    padding: 10px;
-
-    font-family: system-ui;
-    text-align: center;
+    width: 320px;
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.35 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-    /* Dark Mode styles go here. */
+header,
+.site-section,
+label span:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+header {
+    margin-bottom: 14px;
+}
+
+h1,
+h2,
+p {
+    margin: 0;
+}
+
+h1 {
+    font-size: 18px;
+    line-height: 1.1;
+}
+
+h2 {
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+p,
+footer {
+    color: var(--muted);
+}
+
+main {
+    display: grid;
+    gap: 14px;
+}
+
+section {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+
+section:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--control);
+    color: var(--fg);
+}
+
+button:disabled,
+input:disabled + span,
+section[aria-disabled="true"] {
+    opacity: 0.48;
+}
+
+#status-pill {
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--control);
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.segmented {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 3px;
+    border-radius: 8px;
+    background: var(--control);
+}
+
+.segmented label {
+    min-width: 0;
+}
+
+.segmented input {
+    position: absolute;
+    opacity: 0;
+}
+
+.segmented span {
+    display: block;
+    padding: 6px 5px;
+    border-radius: 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.segmented input:checked + span {
+    background: var(--control-active);
+    color: var(--control-active-text);
+}
+
+.switch,
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.switch {
+    flex: 0 0 auto;
+}
+
+.checkbox-row {
+    justify-content: flex-start;
+}
+
+.site-section h2 {
+    margin-bottom: 3px;
+}
+
+.sliders {
+    display: grid;
+    gap: 11px;
+}
+
+.sliders label,
+.sliders input {
+    display: block;
+    width: 100%;
+}
+
+.sliders output {
+    color: var(--muted);
+}
+
+footer {
+    min-height: 18px;
+    margin-top: 14px;
+    font-size: 12px;
 }

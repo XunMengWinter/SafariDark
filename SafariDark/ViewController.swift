@@ -27,16 +27,18 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: extensionBundleIdentifier) { (state, error) in
-            guard let state = state, error == nil else {
-                // Insert code to inform the user that something went wrong.
-                return
-            }
-
             DispatchQueue.main.async {
+                let usesSettingsName: Bool
                 if #available(macOS 13, *) {
-                    webView.evaluateJavaScript("show(\(state.isEnabled), true)")
+                    usesSettingsName = true
                 } else {
-                    webView.evaluateJavaScript("show(\(state.isEnabled), false)")
+                    usesSettingsName = false
+                }
+
+                if let state = state, error == nil {
+                    webView.evaluateJavaScript("showStatus('\(state.isEnabled ? "on" : "off")', \(usesSettingsName))")
+                } else {
+                    webView.evaluateJavaScript("showStatus('error', \(usesSettingsName))")
                 }
             }
         }

@@ -2,10 +2,71 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="popup.css">
     <script type="module" src="popup.js"></script>
 </head>
 <body>
-    <strong>Hello World!</strong>
+    <header>
+        <div>
+            <h1>SafariDark</h1>
+            <p id="site-label">Loading current site...</p>
+        </div>
+        <span id="status-pill">Local</span>
+    </header>
+
+    <main>
+        <section>
+            <h2>Mode</h2>
+            <div class="segmented" role="radiogroup" aria-label="Dark mode">
+                <label><input type="radio" name="mode" value="dark"> <span>Dark</span></label>
+                <label><input type="radio" name="mode" value="original"> <span>Original</span></label>
+                <label><input type="radio" name="mode" value="auto"> <span>Auto</span></label>
+            </div>
+        </section>
+
+        <section class="site-section">
+            <div>
+                <h2>Current Site</h2>
+                <p id="site-detail">Site controls are available on webpages.</p>
+            </div>
+            <label class="switch">
+                <input id="site-enabled" type="checkbox">
+                <span>Enabled</span>
+            </label>
+        </section>
+
+        <section>
+            <label class="checkbox-row">
+                <input id="skip-dark-sites" type="checkbox">
+                <span>Skip websites that are already dark</span>
+            </label>
+        </section>
+
+        <section class="sliders">
+            <label>
+                <span>Brightness <output id="brightness-value"></output></span>
+                <input id="brightness" type="range" min="60" max="140" step="1">
+            </label>
+            <label>
+                <span>Contrast <output id="contrast-value"></output></span>
+                <input id="contrast" type="range" min="60" max="160" step="1">
+            </label>
+            <label>
+                <span>Sepia <output id="sepia-value"></output></span>
+                <input id="sepia" type="range" min="0" max="60" step="1">
+            </label>
+        </section>
+
+        <section>
+            <label class="checkbox-row">
+                <input id="floating-enabled" type="checkbox">
+                <span>Show page control</span>
+            </label>
+            <button id="restore-floating" type="button">Restore on this site</button>
+        </section>
+    </main>
+
+    <footer id="message" role="status" aria-live="polite">Settings apply immediately.</footer>
 </body>
 </html>
