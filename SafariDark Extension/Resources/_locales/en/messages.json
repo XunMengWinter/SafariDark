@@ -4,7 +4,7 @@
         "description": "The display name for the extension."
     },
     "extension_description": {
-        "message": "Darkens webpages locally with per-site controls and adjustable brightness, contrast, and sepia.",
+        "message": "Darkens webpages locally and adds an optional Safari pet companion with per-site controls.",
         "description": "Description of what the extension does."
     }
 }

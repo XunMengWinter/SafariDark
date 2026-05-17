@@ -2,9 +2,9 @@
 
 ## 1. 产品目标
 
-构建一个简洁、稳定、隐私友好的 macOS Safari Web Extension，用于在 Safari 中为网页提供本地深色模式；也可用于在既有 macOS Safari 扩展中增量加入深色模式能力。
+构建一个简洁、稳定、隐私友好的 macOS Safari Web Extension，用于在 Safari 中为网页提供本地深色模式，并提供可选的本地 Safari 宠物陪伴；也可用于在既有 macOS Safari 扩展中增量加入深色模式能力。
 
-用户启用扩展后，可以通过 Safari toolbar popup 控制全局暗色化、当前网站开关和基础视觉参数。
+用户启用扩展后，可以通过 Safari toolbar popup 控制全局暗色化、当前网站开关、基础视觉参数和页面宠物显示。
 
 ## 2. 范围
 
@@ -20,6 +20,7 @@
 - 跳过已有深色网站。
 - iframe 和 `about:blank` 嵌入内容。
 - 跨域 CSS 抓取降级。
+- 可选 Safari 全局宠物，在可注入网页的 top frame 中显示、拖动和按站点隐藏。
 - extension local storage 保存设置。
 
 ### 2.2 默认不做
@@ -43,9 +44,9 @@
   "contrast": 105,
   "sepia": 0,
   "disabledHosts": [],
-  "floatingControlEnabled": false,
+  "floatingControlEnabled": true,
   "floatingControlHiddenHosts": [],
-  "floatingControlPosition": { "x": 16, "y": 16 }
+  "floatingControlPosition": { "x": 18, "y": 128 }
 }
 ```
 
@@ -55,9 +56,9 @@
 - `skipDarkSites`：已有深色网页是否跳过暗色化。
 - `brightness`、`contrast`、`sepia`：视觉参数，保存为数字。
 - `disabledHosts`：当前网站禁用列表，按 hostname 存储。
-- `floatingControlEnabled`：页面悬浮控件全局开关，默认关闭。
-- `floatingControlHiddenHosts`：悬浮控件在当前网站隐藏列表，按 hostname 存储。
-- `floatingControlPosition`：悬浮控件拖动位置。
+- `floatingControlEnabled`：Safari 全局宠物 / 页面快捷控制全局开关，默认开启。
+- `floatingControlHiddenHosts`：宠物在当前网站隐藏列表，按 hostname 存储。
+- `floatingControlPosition`：宠物拖动位置。
 
 ## 4. 实施阶段
 
@@ -136,6 +137,8 @@
 - 支持当前网站启用或禁用。
 - 支持 skip dark websites。
 - 支持 Brightness / Contrast / Sepia 调整。
+- 支持 Safari 宠物全局显示开关。
+- 支持恢复当前网站隐藏的宠物。
 - 保存后通知当前页面重新应用设置。
 - 当前 tab 缺少 content script 时，popup 可主动注入。
 
@@ -185,23 +188,26 @@
 - 动态插入内容后仍能保持合理暗色效果。
 - 低对比文本不应大面积不可读。
 
-### 阶段 7：可选页面悬浮控件
+### 阶段 7：可选 Safari 全局宠物
 
-目标：提供可选的页面内快捷控制。
+目标：提供可选的本地页面宠物，在 Safari 可注入网页中陪伴用户并承载轻量快捷控制。
 
 需求：
 
-- 默认关闭。
+- 默认开启。
 - 只在 top frame 注入。
 - 使用本地资源，不加载远程内容。
 - 支持拖动位置保存。
 - 支持隐藏当前网站，并可在 popup 中恢复。
+- 点击宠物显示轻量菜单，不遮挡页面主要内容。
+- 宠物视觉不应被深色滤镜反色。
 
 验收：
 
-- 默认不会遮挡网页。
-- 启用后可拖动、隐藏和恢复。
-- 在亮色网页上没有明显背景块。
+- 默认出现在可注入网页的 top frame，位置靠左并尽量减少遮挡。
+- 可拖动、隐藏和恢复。
+- 点击后能显示暗色模式当前站点控制和隐藏入口。
+- 在亮色或暗色网页上没有明显背景块，图片颜色保持自然。
 
 ## 5. 隐私与权限
 
@@ -217,9 +223,9 @@
 
 当前 manifest 权限说明：
 
-- `storage`：保存全局模式、站点禁用列表、视觉参数和悬浮控件状态。
+- `storage`：保存全局模式、站点禁用列表、视觉参数和本地宠物状态。
 - `activeTab` 与 `scripting`：popup 保存后向当前页面通知或补注入 content script，使设置尽量无需刷新生效。
-- `<all_urls>` host permission：让 content script 覆盖普通网页、iframe、`about:blank` 嵌入内容，并允许 background 在扩展权限内为跨域 CSS 抓取做降级。
+- `<all_urls>` host permission：让 content script 覆盖普通网页、iframe、`about:blank` 嵌入内容，显示可选宠物，并允许 background 在扩展权限内为跨域 CSS 抓取做降级。
 
 ## 6. 手动测试清单
 
@@ -234,7 +240,7 @@
 - host app 扩展状态展示。
 - host app 打开 Safari Settings。
 - host app 使用引导覆盖启用、toolbar popup 和当前网站调节流程。
-- 可选悬浮控件默认关闭、启用、拖动、隐藏和恢复。
+- 可选 Safari 宠物默认显示、拖动、点击菜单、隐藏和恢复。
 
 ## 7. 完成标准
 

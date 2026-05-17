@@ -1,4 +1,5 @@
 const APPLY_MESSAGE = "safaridark.applySettings";
+const PET_DEFAULT_MIGRATION_KEY = "safaridarkPetDefaultEnabledV1";
 
 const DEFAULT_SETTINGS = {
     mode: "dark",
@@ -7,9 +8,9 @@ const DEFAULT_SETTINGS = {
     contrast: 105,
     sepia: 0,
     disabledHosts: [],
-    floatingControlEnabled: false,
+    floatingControlEnabled: true,
     floatingControlHiddenHosts: [],
-    floatingControlPosition: { x: 16, y: 16 }
+    floatingControlPosition: { x: 18, y: 128 }
 };
 
 const elements = {};
@@ -109,8 +110,21 @@ async function getActiveTab() {
 }
 
 async function loadSettings() {
-    const stored = await browser.storage.local.get(DEFAULT_SETTINGS);
-    return normalizeSettings(stored);
+    const stored = await browser.storage.local.get({
+        ...DEFAULT_SETTINGS,
+        [PET_DEFAULT_MIGRATION_KEY]: false
+    });
+    const normalized = normalizeSettings(stored);
+    if (!stored[PET_DEFAULT_MIGRATION_KEY]) {
+        normalized.floatingControlEnabled = true;
+        normalized.floatingControlHiddenHosts = [];
+        await browser.storage.local.set({
+            floatingControlEnabled: true,
+            floatingControlHiddenHosts: [],
+            [PET_DEFAULT_MIGRATION_KEY]: true
+        });
+    }
+    return normalized;
 }
 
 function normalizeSettings(value) {
@@ -196,7 +210,7 @@ function renderSiteControls() {
     elements["site-enabled"].disabled = !siteAvailable;
     elements["site-enabled"].checked = siteAvailable && !disabled;
     elements["restore-floating"].disabled = !siteAvailable || !floatingHidden;
-    elements["restore-floating"].textContent = floatingHidden ? "Restore on this site" : "Page control visible here";
+    elements["restore-floating"].textContent = floatingHidden ? "Restore pet here" : "Pet visible here";
 }
 
 function renderSliderValue(key) {

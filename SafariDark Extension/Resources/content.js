@@ -7,6 +7,9 @@
     const PRESERVE_MEDIA_CLASS = "safaridark-preserve-media";
     const BACKGROUND_MEDIA_CLASS = "safaridark-background-media";
     const BACKGROUND_CONTENT_CLASS = "safaridark-background-content";
+    const PET_HOST_ID = "safaridark-browser-pet";
+    const PET_IMAGE_PATH = "images/pet-cat.png";
+    const PET_DEFAULT_MIGRATION_KEY = "safaridarkPetDefaultEnabledV1";
     const MAX_REPAIR_ELEMENTS = 350;
     const MIN_BACKGROUND_MEDIA_AREA = 1800;
     const LARGE_BACKGROUND_CONTAINER_AREA = 24000;
@@ -28,10 +31,18 @@
         contrast: 105,
         sepia: 0,
         disabledHosts: [],
-        floatingControlEnabled: false,
+        floatingControlEnabled: true,
         floatingControlHiddenHosts: [],
-        floatingControlPosition: { x: 16, y: 16 }
+        floatingControlPosition: { x: 18, y: 128 }
     };
+
+    const PET_MESSAGES = [
+        "I am here with you.",
+        "Tiny break?",
+        "Dark mode is ready.",
+        "Keeping watch.",
+        "Tap me anytime."
+    ];
 
     if (window[CONTROLLER_KEY]) {
         window[CONTROLLER_KEY].refreshFromStorage();
@@ -48,7 +59,7 @@
         fetchInFlight: false,
         mutationTimer: 0,
         repairTimer: 0,
-        floatingControl: null,
+        browserPet: null,
         systemDarkQuery: window.matchMedia?.("(prefers-color-scheme: dark)") || null,
 
         async start() {
@@ -61,8 +72,20 @@
 
         async refreshFromStorage() {
             try {
-                const stored = await browser.storage.local.get(DEFAULT_SETTINGS);
+                const stored = await browser.storage.local.get({
+                    ...DEFAULT_SETTINGS,
+                    [PET_DEFAULT_MIGRATION_KEY]: false
+                });
                 this.settings = normalizeSettings(stored);
+                if (!stored[PET_DEFAULT_MIGRATION_KEY]) {
+                    this.settings.floatingControlEnabled = true;
+                    this.settings.floatingControlHiddenHosts = [];
+                    await browser.storage.local.set({
+                        floatingControlEnabled: true,
+                        floatingControlHiddenHosts: [],
+                        [PET_DEFAULT_MIGRATION_KEY]: true
+                    });
+                }
                 this.apply();
             } catch {
                 removeEarlyStyle();
@@ -163,7 +186,7 @@
             }
 
             removeEarlyStyle();
-            this.renderFloatingControl(active);
+            this.renderBrowserPet(active);
         },
 
         shouldDarken() {
@@ -257,20 +280,20 @@
             this.repairTimer = setTimeout(() => repairLowContrastText(), 180);
         },
 
-        renderFloatingControl(active) {
+        renderBrowserPet(active) {
             const shouldShow = window.top === window
                 && this.settings.floatingControlEnabled
                 && this.hostname
                 && !this.settings.floatingControlHiddenHosts.includes(this.hostname);
 
             if (!shouldShow) {
-                this.floatingControl?.destroy();
-                this.floatingControl = null;
+                this.browserPet?.destroy();
+                this.browserPet = null;
                 return;
             }
 
-            if (!this.floatingControl) {
-                this.floatingControl = createFloatingControl({
+            if (!this.browserPet) {
+                this.browserPet = createBrowserPet({
                     settings: this.settings,
                     hostname: this.hostname,
                     active,
@@ -281,7 +304,7 @@
                     }
                 });
             } else {
-                this.floatingControl.update(this.settings, active);
+                this.browserPet.update(this.settings, active);
             }
         }
     };
@@ -534,6 +557,22 @@
         }
     }
 
+    function appendVisualToDocument(node) {
+        const parent = document.body || document.documentElement;
+        if (parent) {
+            parent.appendChild(node);
+            if (!document.body) {
+                document.addEventListener("DOMContentLoaded", () => {
+                    if (document.body && node.parentNode !== document.body) {
+                        document.body.appendChild(node);
+                    }
+                }, { once: true });
+            }
+        } else {
+            document.addEventListener("DOMContentLoaded", () => appendVisualToDocument(node), { once: true });
+        }
+    }
+
     function clearContrastRepair() {
         document.querySelectorAll(".safaridark-repair-light-bg, .safaridark-repair-dark-bg").forEach((element) => {
             element.classList.remove("safaridark-repair-light-bg", "safaridark-repair-dark-bg");
@@ -569,16 +608,16 @@
         }
     }
 
-    function createFloatingControl(options) {
+    function createBrowserPet(options) {
         const host = document.createElement("div");
-        host.id = "safaridark-floating-control";
+        host.id = PET_HOST_ID;
         host.style.position = "fixed";
         host.style.zIndex = "2147483647";
         host.style.left = `${options.settings.floatingControlPosition.x}px`;
         host.style.top = `${options.settings.floatingControlPosition.y}px`;
-        host.style.width = "42px";
-        host.style.height = "42px";
-        appendToDocument(host);
+        host.style.width = "78px";
+        host.style.height = "78px";
+        appendVisualToDocument(host);
 
         const shadow = host.attachShadow({ mode: "closed" });
         shadow.innerHTML = `
@@ -587,28 +626,41 @@
                 .wrap {
                     position: relative;
                     font: 13px/1.3 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+                    width: 78px;
+                    height: 78px;
                 }
                 button {
                     font: inherit;
                 }
                 .trigger {
-                    width: 42px;
-                    height: 42px;
-                    border: 1px solid rgba(255,255,255,.32);
-                    border-radius: 50%;
-                    background: rgba(20, 22, 26, .72);
-                    color: white;
-                    font-weight: 700;
-                    box-shadow: 0 6px 18px rgba(0,0,0,.18);
-                    -webkit-backdrop-filter: blur(12px);
-                    backdrop-filter: blur(12px);
+                    width: 78px;
+                    height: 78px;
+                    padding: 0;
+                    border: 0;
+                    border-radius: 0;
+                    background: transparent;
+                    cursor: grab;
+                    touch-action: none;
+                    transform-origin: 50% 80%;
+                    animation: breathe 2.8s ease-in-out infinite;
+                }
+                .trigger:active {
+                    cursor: grabbing;
+                }
+                .trigger img {
+                    display: block;
+                    width: 78px;
+                    height: 78px;
+                    object-fit: contain;
+                    pointer-events: none;
+                    filter: drop-shadow(0 5px 10px rgba(0,0,0,.22));
                 }
                 .menu {
                     position: absolute;
-                    top: 48px;
-                    left: 0;
+                    top: 76px;
+                    left: 7px;
                     display: none;
-                    min-width: 142px;
+                    min-width: 154px;
                     padding: 6px;
                     border: 1px solid rgba(0,0,0,.14);
                     border-radius: 8px;
@@ -620,6 +672,22 @@
                 .menu.open {
                     display: grid;
                     gap: 4px;
+                }
+                .speech {
+                    position: absolute;
+                    right: -62px;
+                    bottom: 56px;
+                    display: none;
+                    max-width: 132px;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    background: rgba(255,255,255,.94);
+                    color: #111;
+                    box-shadow: 0 8px 20px rgba(0,0,0,.16);
+                    white-space: nowrap;
+                }
+                .speech.show {
+                    display: block;
                 }
                 .menu button {
                     width: 100%;
@@ -633,9 +701,19 @@
                 .menu button:hover {
                     background: rgba(0,0,0,.08);
                 }
+                @keyframes breathe {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-3px) scale(1.025); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .trigger { animation: none; }
+                }
             </style>
             <div class="wrap">
-                <button class="trigger" type="button" aria-label="SafariDark page controls" title="SafariDark">D</button>
+                <button class="trigger" type="button" aria-label="Safari pet controls" title="Safari pet">
+                    <img alt="" src="${browser.runtime.getURL(PET_IMAGE_PATH)}">
+                </button>
+                <div class="speech" role="status"></div>
                 <div class="menu" role="menu">
                     <button class="toggle-site" type="button"></button>
                     <button class="hide-site" type="button">Hide on this site</button>
@@ -646,6 +724,7 @@
 
         const trigger = shadow.querySelector(".trigger");
         const menu = shadow.querySelector(".menu");
+        const speech = shadow.querySelector(".speech");
         const toggleSite = shadow.querySelector(".toggle-site");
         const hideSite = shadow.querySelector(".hide-site");
         const close = shadow.querySelector(".close");
@@ -653,18 +732,27 @@
         let active = options.active;
         let drag = null;
         let moved = false;
+        let messageTimer = 0;
+        const handleResize = () => placeControl(settings.floatingControlPosition);
 
         function update(nextSettings, nextActive) {
             settings = normalizeSettings(nextSettings);
             active = nextActive;
             toggleSite.textContent = settings.disabledHosts.includes(options.hostname) ? "Enable here" : "Disable here";
-            trigger.style.background = active ? "rgba(20, 22, 26, .78)" : "rgba(92, 92, 96, .62)";
+            host.style.filter = active ? "var(--safaridark-counter-filter)" : "";
             placeControl(settings.floatingControlPosition);
         }
 
         function placeControl(position) {
-            host.style.left = `${Math.min(Math.max(position.x, 0), Math.max(0, window.innerWidth - 46))}px`;
-            host.style.top = `${Math.min(Math.max(position.y, 0), Math.max(0, window.innerHeight - 46))}px`;
+            host.style.left = `${Math.min(Math.max(position.x, 0), Math.max(0, window.innerWidth - 82))}px`;
+            host.style.top = `${Math.min(Math.max(position.y, 0), Math.max(0, window.innerHeight - 82))}px`;
+        }
+
+        function say(message) {
+            clearTimeout(messageTimer);
+            speech.textContent = message;
+            speech.classList.add("show");
+            messageTimer = setTimeout(() => speech.classList.remove("show"), 1800);
         }
 
         trigger.addEventListener("pointerdown", (event) => {
@@ -706,6 +794,7 @@
 
             if (!moved) {
                 menu.classList.toggle("open");
+                say(PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)]);
             }
         });
 
@@ -714,6 +803,7 @@
             settings.disabledHosts = updateHostList(settings.disabledHosts, options.hostname, !disabled);
             await options.onChange(settings);
             update(settings, !settings.disabledHosts.includes(options.hostname));
+            say(settings.disabledHosts.includes(options.hostname) ? "Disabled here." : "Enabled here.");
         });
 
         hideSite.addEventListener("click", async () => {
@@ -723,9 +813,11 @@
         });
 
         close.addEventListener("click", () => menu.classList.remove("open"));
-        window.addEventListener("resize", () => placeControl(settings.floatingControlPosition));
+        window.addEventListener("resize", handleResize);
 
         function destroy() {
+            clearTimeout(messageTimer);
+            window.removeEventListener("resize", handleResize);
             host.remove();
         }
 
@@ -942,7 +1034,7 @@
     function isSafariDarkOwnedElement(element) {
         return element.id === STYLE_ID
             || element.id === EARLY_STYLE_ID
-            || element.id === "safaridark-floating-control"
-            || Boolean(element.closest?.("#safaridark-floating-control"));
+            || element.id === PET_HOST_ID
+            || Boolean(element.closest?.(`#${PET_HOST_ID}`));
     }
 })();

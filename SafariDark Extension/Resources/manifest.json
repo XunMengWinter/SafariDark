@@ -32,6 +32,11 @@
         "default_icon": "images/toolbar-icon.svg"
     },
 
+    "web_accessible_resources": [{
+        "resources": [ "images/pet-cat.png" ],
+        "matches": [ "<all_urls>" ]
+    }],
+
     "permissions": [ "storage", "activeTab", "scripting" ],
 
     "host_permissions": [ "<all_urls>" ]
