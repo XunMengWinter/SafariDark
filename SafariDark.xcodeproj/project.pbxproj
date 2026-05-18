@@ -8,9 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		587C16352FB9FF2F003F8BB8 /* SafariDark Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 587C16342FB9FF2F003F8BB8 /* SafariDark Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		587C16582FBA0143003F8BB8 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 587C16572FBA0143003F8BB8 /* AGENTS.md */; };
-		587C165A2FBA0153003F8BB8 /* DESIGN.md in Resources */ = {isa = PBXBuildFile; fileRef = 587C16592FBA0153003F8BB8 /* DESIGN.md */; };
-		587C165C2FBA0165003F8BB8 /* SPEC.md in Resources */ = {isa = PBXBuildFile; fileRef = 587C165B2FBA0165003F8BB8 /* SPEC.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +40,7 @@
 		587C16572FBA0143003F8BB8 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		587C16592FBA0153003F8BB8 /* DESIGN.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = DESIGN.md; sourceTree = "<group>"; };
 		587C165B2FBA0165003F8BB8 /* SPEC.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEC.md; sourceTree = "<group>"; };
+		5884CA0D2FBAA2A700F1DB1F /* IMPLEMENTED.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTED.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -96,6 +94,7 @@
 		587C16112FB9FF2D003F8BB8 = {
 			isa = PBXGroup;
 			children = (
+				5884CA0D2FBAA2A700F1DB1F /* IMPLEMENTED.md */,
 				587C165B2FBA0165003F8BB8 /* SPEC.md */,
 				587C16592FBA0153003F8BB8 /* DESIGN.md */,
 				587C16572FBA0143003F8BB8 /* AGENTS.md */,
@@ -206,9 +205,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				587C165C2FBA0165003F8BB8 /* SPEC.md in Resources */,
-				587C165A2FBA0153003F8BB8 /* DESIGN.md in Resources */,
-				587C16582FBA0143003F8BB8 /* AGENTS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
