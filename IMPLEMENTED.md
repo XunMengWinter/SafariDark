@@ -16,7 +16,7 @@
 - extension manifest：`SafariDark Extension/Resources/manifest.json`。
 - extension 脚本：`SafariDark Extension/Resources/content.js`、`SafariDark Extension/Resources/background.js`、`SafariDark Extension/Resources/popup.js`。
 - popup 页面：`SafariDark Extension/Resources/popup.html`、`SafariDark Extension/Resources/popup.css`。
-- 宠物资源：`SafariDark Extension/Resources/images/pet-cat.png`。
+- 图标与宠物资源：`SafariDark Extension/Resources/images/toolbar-icon.svg`、`SafariDark Extension/Resources/images/pet-cat.png`。
 
 ## 已实现能力
 
@@ -43,6 +43,7 @@
 - 支持 Brightness、Contrast、Sepia 参数。
 - 支持 Safari 宠物显示开关。
 - 支持恢复当前网站隐藏的宠物。
+- popup 标题区显示本地猫图标，toolbar action 图标使用本地猫脸 SVG。
 - 保存设置后会通知当前 tab；当前 tab 没有 content script 时，会尝试通过 `scripting.executeScript` 补注入。
 
 ### 暗色化运行时
